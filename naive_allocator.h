@@ -4,11 +4,11 @@
 namespace yaa {
     template <typename T>
     class naive_allocator {
+    public:
         typedef T value_type;
         typedef std::size_t size_type;
         typedef std::ptrdiff_t difference_type;
 
-    public:
         [[nodiscard]] constexpr T* allocate(std::size_t n) {
             auto buf = reinterpret_cast<T*>(::operator new[](n * sizeof(T)));
             if (buf == 0) {
