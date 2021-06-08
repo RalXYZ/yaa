@@ -10,18 +10,17 @@ namespace yaa {
         typedef std::ptrdiff_t difference_type;
 
         [[nodiscard]] constexpr T* allocate(std::size_t n) {
-            auto buf = reinterpret_cast<T*>(::operator new[](n * sizeof(T)));
-            if (buf == 0) {
+            auto buffer = reinterpret_cast<T*>(::operator new[](n * sizeof(T)));
+            if (buffer == nullptr) {
                 throw std::bad_alloc();
             }
-            return buf;
+            return buffer;
         }
 
-        constexpr void deallocate(T* buf, std::size_t) {
-            ::operator delete[](buf);
+        constexpr void deallocate(T* p, std::size_t) {
+            ::operator delete[](p);
         }
     };
 }
-
 
 #endif //YAA_NAIVE_ALLOCATOR_H
