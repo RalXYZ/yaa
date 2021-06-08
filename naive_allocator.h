@@ -9,18 +9,38 @@ namespace yaa {
         typedef std::size_t size_type;
         typedef std::ptrdiff_t difference_type;
 
-        [[nodiscard]] constexpr T* allocate(std::size_t n) {
-            auto buffer = reinterpret_cast<T*>(::operator new[](n * sizeof(T)));
-            if (buffer == nullptr) {
-                throw std::bad_alloc();
-            }
-            return buffer;
+        [[nodiscard]] constexpr T* allocate(std::size_t n);
+
+        constexpr void deallocate(T* p, std::size_t);
+    };
+
+    template <typename T>
+    constexpr T* naive_allocator<T>::allocate(std::size_t n) {
+        /*
+         * since C++11, std::allocator<T>::allocate
+         * throws std::bad_array_new_length if
+         * std::numeric_limits<std::size_t>::max() / sizeof(T) < n.
+         */
+        if (std::numeric_limits<std::size_t>::max() / sizeof(T) < n) {
+            throw std::bad_array_new_length();
         }
 
-        constexpr void deallocate(T* p, std::size_t) {
-            ::operator delete[](p);
+        auto buffer = reinterpret_cast<T*>(::operator new(n * sizeof(T)));
+
+        /*
+         * throws std::bad_alloc if allocation fails.
+         */
+        if (buffer == nullptr) {
+            throw std::bad_alloc();
         }
-    };
+
+        return buffer;
+    }
+
+    template <typename T>
+    constexpr void naive_allocator<T>::deallocate(T* p, std::size_t) {
+        ::operator delete(p);
+    }
 }
 
 #endif //YAA_NAIVE_ALLOCATOR_H
