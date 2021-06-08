@@ -62,6 +62,12 @@ namespace yaa {
         // division in C/C++ rounds down the result, but we want to round up, so we perform "+1"
         const auto block_amount = applied_bytes / BYTES_PER_BLOCK + (applied_bytes % BYTES_PER_BLOCK == 0 ? 0 : 1);
 
+        /*
+         * we need to step over the data blocks
+         * before the buffer_to_return, there is a pointer,
+         * which points to the first free block after the allocated block.
+         * this pointer will be stored at step_start_ptr
+         */
         asd* step_start_ptr = nullptr;
         auto buffer_to_return = pool_start_ptr;
         for (auto iter = buffer_to_return; ; step_start_ptr = iter, buffer_to_return = iter->next_ptr) {
@@ -69,6 +75,13 @@ namespace yaa {
                 throw std::bad_alloc();
             }
             bool do_not_need_jump = true;
+
+            /*
+             * -1 because we do not care about what is in the last block to allocate.
+             * if the last block stores is empty, then nothing will happen.
+             * if the last block stores a pointer, this means the block after this block stores data,
+             * this means the newly allocated buffer is adjacent to the next buffer.
+             */
             for (int i = 0; i < block_amount - 1; i++, iter++) {
                 if (is_block_ptr[iter - pool]) {
                     do_not_need_jump = false;
@@ -87,9 +100,10 @@ namespace yaa {
             step_end_ptr = pool[buffer_to_return_end_block].next_ptr;
         }
 
+        // update pool_end_ptr if necessary
         pool_end_ptr = step_end_ptr > pool_end_ptr ? step_end_ptr : pool_end_ptr;
 
-        if (step_start_ptr == nullptr) {
+        if (step_start_ptr == nullptr) {  // the newly allocated buffer is at the start
             pool_start_ptr = step_end_ptr;
         } else {
             pool[step_start_ptr - pool].next_ptr = step_end_ptr;
