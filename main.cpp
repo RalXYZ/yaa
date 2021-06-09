@@ -10,8 +10,8 @@ using my_allocator = yaa::allocator<T>;
 
 using point_2d = std::pair<int, int>;
 
-const int TEST_SIZE = 10;
-const int PICK_SIZE = 10;
+const int TEST_SIZE = 50;
+const int PICK_SIZE = 50;
 
 void test() {
     std::random_device rd;

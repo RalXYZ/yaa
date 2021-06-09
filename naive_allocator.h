@@ -11,7 +11,7 @@ namespace yaa {
 
         [[nodiscard]]
         constexpr auto allocate(std::size_t) -> T*;
-        constexpr auto deallocate(T*, std::size_t);
+        constexpr auto deallocate(T*, std::size_t) -> void;
     };
 
     template <typename T>
@@ -38,7 +38,7 @@ namespace yaa {
     }
 
     template <typename T>
-    constexpr auto naive_allocator<T>::deallocate(T* p, std::size_t) {
+    constexpr auto naive_allocator<T>::deallocate(T* p, std::size_t) -> void {
         ::operator delete(p);
     }
 }
