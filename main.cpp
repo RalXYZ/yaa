@@ -6,17 +6,14 @@
 #include "naive_allocator.h"
 
 template <typename T>
-using my_allocator = yaa::naive_allocator<T>;
-
-template <typename T>
-using his_allocator = yaa::allocator<T>;
+using my_allocator = yaa::allocator<T>;
 
 using point_2d = std::pair<int, int>;
 
-const int TEST_SIZE = 10000;
-const int PICK_SIZE = 1000;
+const int TEST_SIZE = 10;
+const int PICK_SIZE = 10;
 
-int main() {
+void test() {
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_int_distribution<> dis(1, TEST_SIZE);
@@ -63,6 +60,12 @@ int main() {
         else
             std::cout << "incorrect assignment in vec_pts: " << idx1 << std::endl;
     }
+}
+
+int main() {
+    test();
+    using int_vec = std::vector<int, yaa::naive_allocator<int>>;
+    int_vec vec(TEST_SIZE);
 
     return 0;
 }
