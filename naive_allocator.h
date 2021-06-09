@@ -5,17 +5,17 @@ namespace yaa {
     template <typename T>
     class naive_allocator {
     public:
-        typedef T value_type;
-        typedef std::size_t size_type;
-        typedef std::ptrdiff_t difference_type;
+        using value_type = T;
+        using size_type = std::size_t;
+        using difference_type = std::ptrdiff_t;
 
-        [[nodiscard]] constexpr T* allocate(std::size_t n);
-
-        constexpr void deallocate(T* p, std::size_t);
+        [[nodiscard]]
+        constexpr auto allocate(std::size_t) -> T*;
+        constexpr auto deallocate(T*, std::size_t) -> void;
     };
 
     template <typename T>
-    constexpr T* naive_allocator<T>::allocate(std::size_t n) {
+    constexpr auto naive_allocator<T>::allocate(std::size_t n) -> T* {
         /*
          * since C++11, std::allocator<T>::allocate
          * throws std::bad_array_new_length if
@@ -38,7 +38,7 @@ namespace yaa {
     }
 
     template <typename T>
-    constexpr void naive_allocator<T>::deallocate(T* p, std::size_t) {
+    constexpr auto naive_allocator<T>::deallocate(T* p, std::size_t) -> void {
         ::operator delete(p);
     }
 }
