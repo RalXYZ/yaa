@@ -1,25 +1,16 @@
 #ifndef YAA_ALLOCATOR_H
 #define YAA_ALLOCATOR_H
 
+#include <memory>
 #include <iostream>
 
-const std::size_t BLOCK_NUM_IN_POOL = 10'000;
-using data_block = uint64_t;
-const std::size_t BYTES_PER_BLOCK = sizeof(data_block) / sizeof(uint8_t);
-
-union block {
-    data_block blk;
-    block *next_ptr;
-};
-
-block *pool = nullptr;
-bool *is_ptr = nullptr;
-block *pool_start_ptr = nullptr;
-block *pool_end_ptr = nullptr;
+#include "page.h"
 
 namespace yaa {
     template <typename T>
     class allocator {
+        page* pool = nullptr;
+
         [[nodiscard]]
         static constexpr auto calc_block_amount(std::size_t) noexcept -> std::size_t;
 
@@ -46,24 +37,15 @@ namespace yaa {
     template <typename T>
     constexpr allocator<T>::allocator() {
         if (pool == nullptr) {
-            pool = new block[BLOCK_NUM_IN_POOL];
-            pool_start_ptr = pool;
-            pool_end_ptr = pool_start_ptr;
-
-            is_ptr = new bool[BLOCK_NUM_IN_POOL];
-            for (auto i = 0; i < BLOCK_NUM_IN_POOL; i++) {
-                is_ptr[i] = false;
-            }
-
-            std::cout << "pool start at " << pool << std::endl;
+            pool = new page;
         }
     }
 
     template <typename T>
     constexpr auto allocator<T>::allocate(std::size_t n) -> T* {
-
+#ifdef DEBUG
         std::cout << "allocate function in" << std::endl;
-
+#endif
         /*
          * since C++11, std::allocator<T>::allocate
          * throws std::bad_array_new_length if
@@ -81,12 +63,12 @@ namespace yaa {
          * which points to the first free data_block after the allocated data_block.
          * this pointer will be stored at step_start_ptr
          */
-        block* step_start_ptr = nullptr;
-        auto buffer_to_return = pool_start_ptr;
+        page::block* step_start_ptr = nullptr;
+        auto buffer_to_return = pool->pool_start_ptr;
         {
             auto iter = buffer_to_return;
             while (true) {
-                if (buffer_to_return + (block_amount - 1) > pool + BLOCK_NUM_IN_POOL) {
+                if (buffer_to_return + (block_amount - 1) > pool->pool_ptr + BLOCK_NUM_IN_POOL) {
                     throw std::bad_alloc();
                 }
                 bool do_not_need_jump = true;
@@ -98,7 +80,7 @@ namespace yaa {
                  * this means the newly allocated buffer is adjacent to the next buffer.
                  */
                 for (int i = 0; i < block_amount - 1; i++, iter++) {
-                    if (is_ptr[iter - pool]) {
+                    if (pool->is_ptr[iter - pool->pool_ptr]) {
                         do_not_need_jump = false;
                         break;
                     }
@@ -114,68 +96,70 @@ namespace yaa {
         }
 
         auto step_end_ptr = buffer_to_return + block_amount;
-        const auto buffer_to_return_end_block = buffer_to_return - pool + (block_amount - 1);
-        if (is_ptr[buffer_to_return_end_block]) {
-            is_ptr[buffer_to_return_end_block] = false;
-            step_end_ptr = pool[buffer_to_return_end_block].next_ptr;
+        const auto buffer_to_return_end_block = buffer_to_return - pool->pool_ptr + (block_amount - 1);
+        if (pool->is_ptr[buffer_to_return_end_block]) {
+            pool->is_ptr[buffer_to_return_end_block] = false;
+            step_end_ptr = pool->pool_ptr[buffer_to_return_end_block].next_ptr;
         }
 
         // update pool_end_ptr if necessary
-        pool_end_ptr = step_end_ptr > pool_end_ptr ? step_end_ptr : pool_end_ptr;
+        pool->pool_end_ptr = step_end_ptr > pool->pool_end_ptr ? step_end_ptr : pool->pool_end_ptr;
 
         if (step_start_ptr == nullptr) {  // the newly allocated buffer is at the start
-            pool_start_ptr = step_end_ptr;
+            pool->pool_start_ptr = step_end_ptr;
         } else {
-            pool[step_start_ptr - pool].next_ptr = step_end_ptr;
+            pool->pool_ptr[step_start_ptr - pool->pool_ptr].next_ptr = step_end_ptr;
         }
-
+#ifdef DEBUG
         std::cout << "allocate function out" << std::endl;
-
+#endif
         return reinterpret_cast<T*>(buffer_to_return);
     }
 
     template <typename T>
     constexpr auto allocator<T>::deallocate(T* p, std::size_t n) -> void {
         const auto block_amount = calc_block_amount(n);
-        const auto block_front_ptr = reinterpret_cast<block*>(p);
+        const auto block_front_ptr = reinterpret_cast<page::block*>(p);
         const auto block_back_ptr = block_front_ptr + block_amount - 1;
-
+#ifdef DEBUG
         std::cout << "deallocate function in" << std::endl;
-
+#endif
         auto step_start_ptr = block_front_ptr;
-        for (; step_start_ptr >= pool; step_start_ptr--) {
-            if (is_ptr[step_start_ptr - pool]) {
+        for (; step_start_ptr >= pool->pool_ptr; step_start_ptr--) {
+            if (pool->is_ptr[step_start_ptr - pool->pool_ptr]) {
                 break;
             }
         }
 
-        auto step_end_ptr = step_start_ptr < pool ? pool_start_ptr : step_start_ptr->next_ptr;
+        auto step_end_ptr = step_start_ptr < pool->pool_ptr ? pool->pool_start_ptr : step_start_ptr->next_ptr;
         /*
          * step_start_ptr does not exist, meaning
          * there are adjacent data blocks
-         * all the way to the front of the pool
+         * all the way to the front of the pool_ptr
          */
-        if (step_start_ptr < pool) {
-            pool_start_ptr = block_front_ptr;
+        if (step_start_ptr < pool->pool_ptr) {
+            pool->pool_start_ptr = block_front_ptr;
         } else {
             if (step_start_ptr == block_front_ptr - 1) {
-                is_ptr[step_start_ptr - pool] = false;
+                pool->is_ptr[step_start_ptr - pool->pool_ptr] = false;
             } else {
                 step_start_ptr->next_ptr = block_front_ptr;
             }
         }
 
-        if (block_back_ptr + 1 == pool_end_ptr) {
-            pool_end_ptr = block_front_ptr;
+        if (block_back_ptr + 1 == pool->pool_end_ptr) {
+            pool->pool_end_ptr = block_front_ptr;
         }
 
         if (step_end_ptr > block_back_ptr + 1) {
-            is_ptr[block_back_ptr - pool] = true;
+            pool->is_ptr[block_back_ptr - pool->pool_ptr] = true;
             block_back_ptr->next_ptr = step_end_ptr;
         }
+#ifdef DEBUG
         std::cout << "block back_ptr at " << block_back_ptr << std::endl;
-        std::cout << "pool end_ptr at " << pool_end_ptr << std::endl;
+        std::cout << "pool_ptr end_ptr at " << pool->pool_end_ptr << std::endl;
         std::cout << "deallocate function out" << std::endl;
+#endif
     }
 }
 

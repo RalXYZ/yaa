@@ -1,32 +1,34 @@
 #include <iostream>
 #include <random>
 #include <vector>
+#include <chrono>
 
 #include "allocator.h"
 #include "naive_allocator.h"
 
-template <typename T>
-using my_allocator = yaa::allocator<T>;
-
 using point_2d = std::pair<int, int>;
 
-const int TEST_SIZE = 50;
-const int PICK_SIZE = 50;
+const int TEST_SIZE = 5'000;
+const int PICK_SIZE = 100;
 
+template <template <typename> typename Alloc>
 void test() {
+    using microseconds = std::chrono::microseconds;
+    auto start = std::chrono::system_clock::now();
+
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_int_distribution<> dis(1, TEST_SIZE);
 
     // vector creation
-    using int_vec = std::vector<int, my_allocator<int>>;
-    std::vector<int_vec, my_allocator<int_vec>> vec_ints(TEST_SIZE);
+    using int_vec = std::vector<int, Alloc<int>>;
+    std::vector<int_vec, Alloc<int_vec>> vec_ints(TEST_SIZE);
     for (auto i = 0; i < TEST_SIZE; i++) {
         vec_ints.at(i).resize(dis(gen));
     }
 
-    using point_vec = std::vector<point_2d, my_allocator<point_2d>>;
-    std::vector<point_vec, my_allocator<point_vec>> vec_pts(TEST_SIZE);
+    using point_vec = std::vector<point_2d, Alloc<point_2d>>;
+    std::vector<point_vec, Alloc<point_vec>> vec_pts(TEST_SIZE);
     for (auto i = 0; i < TEST_SIZE; i++) {
         vec_pts.at(i).resize(dis(gen));
     }
@@ -60,12 +62,18 @@ void test() {
         else
             std::cout << "incorrect assignment in vec_pts: " << idx1 << std::endl;
     }
+
+    auto end = std::chrono::system_clock::now();
+
+    std::cout << "cost "
+            << duration_cast<microseconds>(end - start).count()
+            << " microseconds"
+            << std::endl;
 }
 
 int main() {
-    test();
-    using int_vec = std::vector<int, yaa::naive_allocator<int>>;
-    int_vec vec(TEST_SIZE);
+    test<yaa::naive_allocator>();
+    test<yaa::allocator>();
 
     return 0;
 }
