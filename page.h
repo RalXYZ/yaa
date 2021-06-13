@@ -3,7 +3,8 @@
 
 #include <cstdint>
 
-const std::size_t BLOCK_NUM_IN_POOL = 500'000;
+const std::size_t BLOCK_NUM_IN_POOL = 100'000;
+const std::size_t ALLOCATE_UPPER_BOUND = 0x1000;
 using data_block = uint64_t;
 const std::size_t BYTES_PER_BLOCK = sizeof(data_block) / sizeof(uint8_t);
 

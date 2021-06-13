@@ -55,6 +55,10 @@ namespace yaa {
             throw std::bad_array_new_length();
         }
 
+        if (n * sizeof(T) > ALLOCATE_UPPER_BOUND) {
+            return reinterpret_cast<T*>(::operator new(n * sizeof(T)));
+        }
+
         const auto block_amount = calc_block_amount(n);
 
         /*
@@ -124,6 +128,12 @@ namespace yaa {
 #ifdef DEBUG
         std::cout << "deallocate function in" << std::endl;
 #endif
+        if (!((pool->pool_ptr <= reinterpret_cast<page::block*>(p)) &&
+            (reinterpret_cast<page::block*>(p) < pool->pool_ptr + BLOCK_NUM_IN_POOL))) {
+            ::operator delete(p);
+            return;
+        }
+
         auto step_start_ptr = block_front_ptr;
         for (; step_start_ptr >= pool->pool_ptr; step_start_ptr--) {
             if (pool->is_ptr[step_start_ptr - pool->pool_ptr]) {
