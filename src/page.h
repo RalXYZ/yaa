@@ -18,7 +18,7 @@ struct page {
 
     block *pool_ptr = nullptr;
     bool *is_ptr = nullptr;
-    block *pool_start_ptr = nullptr;
+    block *pool_begin_ptr = nullptr;
     block *pool_end_ptr = nullptr;
 };
 

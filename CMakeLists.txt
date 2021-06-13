@@ -3,4 +3,6 @@ project(yaa)
 
 set(CMAKE_CXX_STANDARD 20)
 
-add_executable(yaa main.cpp naive_allocator.h allocator.h page.cpp page.h test.h)
+include_directories(src)
+
+add_executable(yaa src/main.cpp src/naive_allocator.h src/allocator.h src/page.cpp src/page.h src/test.h)

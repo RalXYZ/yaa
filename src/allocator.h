@@ -68,7 +68,7 @@ namespace yaa {
          * this pointer will be stored at step_start_ptr
          */
         page::block* step_start_ptr = nullptr;
-        auto buffer_to_return = pool->pool_start_ptr;
+        auto buffer_to_return = pool->pool_begin_ptr;
         {
             auto iter = buffer_to_return;
             while (true) {
@@ -110,7 +110,7 @@ namespace yaa {
         pool->pool_end_ptr = step_end_ptr > pool->pool_end_ptr ? step_end_ptr : pool->pool_end_ptr;
 
         if (step_start_ptr == nullptr) {  // the newly allocated buffer is at the start
-            pool->pool_start_ptr = step_end_ptr;
+            pool->pool_begin_ptr = step_end_ptr;
         } else {
             pool->pool_ptr[step_start_ptr - pool->pool_ptr].next_ptr = step_end_ptr;
         }
@@ -141,14 +141,14 @@ namespace yaa {
             }
         }
 
-        auto step_end_ptr = step_start_ptr < pool->pool_ptr ? pool->pool_start_ptr : step_start_ptr->next_ptr;
+        auto step_end_ptr = step_start_ptr < pool->pool_ptr ? pool->pool_begin_ptr : step_start_ptr->next_ptr;
         /*
          * step_start_ptr does not exist, meaning
          * there are adjacent data blocks
          * all the way to the front of the pool_ptr
          */
         if (step_start_ptr < pool->pool_ptr) {
-            pool->pool_start_ptr = block_front_ptr;
+            pool->pool_begin_ptr = block_front_ptr;
         } else {
             if (step_start_ptr == block_front_ptr - 1) {
                 pool->is_ptr[step_start_ptr - pool->pool_ptr] = false;
