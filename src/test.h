@@ -19,6 +19,9 @@ auto test() -> void;
 
 /***************************************************************************/
 
+/*
+ * generates a random number by uniform distribution
+ */
 auto generate_random(const int max = TEST_SIZE) -> int {
     std::random_device rd;
     std::mt19937 gen(rd());
@@ -34,6 +37,9 @@ auto generate_random(const int max = TEST_SIZE) -> int {
     return dis(gen);
 }
 
+/*
+ * test a specified type of element
+ */
 template <typename Tp, template <typename> typename Alloc>
 auto test_arg(const Tp& test_val, const Tp& fill_value) -> void {
     using one_dim_vec = std::vector<Tp, Alloc<Tp>>;
@@ -83,6 +89,9 @@ auto test_arg(const Tp& test_val, const Tp& fill_value) -> void {
     }
 }
 
+/*
+ * the entrance of testing procedure
+ */
 template <template <typename> typename Alloc>
 auto test() -> void {
     using microseconds = std::chrono::microseconds;
