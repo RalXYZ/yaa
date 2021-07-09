@@ -5,13 +5,23 @@
 #include <random>
 #include <vector>
 #include <chrono>
+#include <concepts>
 
 const int TEST_SIZE = 5'000;
 const int PICK_SIZE = 100;
 
 static auto generate_random(int) -> int;
 
-template <typename Tp, template <typename> typename Alloc>
+template<typename Tp, template <typename> typename Alloc>
+concept allocator = requires(Tp value, Alloc<Tp> alloc) {
+    typename Alloc<Tp>::value_type;
+    typename Alloc<Tp>::size_type;
+    typename Alloc<Tp>::difference_type;
+    alloc.allocate(static_cast<std::size_t>(0));
+    alloc.deallocate(&value, static_cast<std::size_t>(0));
+};
+
+template <typename Tp, template <typename> typename Alloc> requires allocator<Tp, Alloc>
 static auto test_arg(Tp&, Tp&) -> void;
 
 template <template <typename> typename Alloc>
@@ -40,7 +50,7 @@ auto generate_random(const int max = TEST_SIZE) -> int {
 /*
  * test a specified type of element
  */
-template <typename Tp, template <typename> typename Alloc>
+template <typename Tp, template <typename> typename Alloc> requires allocator<Tp, Alloc>
 auto test_arg(const Tp& test_val, const Tp& fill_value) -> void {
     using one_dim_vec = std::vector<Tp, Alloc<Tp>>;
     using two_dim_vec = std::vector<one_dim_vec, Alloc<one_dim_vec>>;
