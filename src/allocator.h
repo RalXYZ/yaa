@@ -1,6 +1,7 @@
 #ifndef YAA_ALLOCATOR_H
 #define YAA_ALLOCATOR_H
 
+#include <vector>
 #include <memory>
 #include <iostream>
 
@@ -8,14 +9,17 @@
 
 namespace yaa {
     /*
-     * standard implementation of allocator in C++20
+     * standard declaration of allocator in C++20
      */
     template <typename T>
     class allocator {
-        page* pool = nullptr;
+        // page* pool = nullptr;
+        static std::vector<page*> page_vec;
 
         [[nodiscard]]
         static constexpr auto calc_block_amount(std::size_t) noexcept -> std::size_t;
+        [[nodiscard]]
+        auto get_page(T*) -> page*;
 
     public:
         using value_type = T;
@@ -29,6 +33,10 @@ namespace yaa {
         constexpr auto deallocate(T*, std::size_t) -> void;
     };
 
+    template <typename T>
+    std::vector<page*> allocator<T>::page_vec = std::vector<page*>();
+
+
     template<typename T>
     constexpr auto allocator<T>::calc_block_amount(std::size_t bytes_num) noexcept -> std::size_t {
         const auto applied_bytes = bytes_num * sizeof(T);
@@ -38,9 +46,24 @@ namespace yaa {
     }
 
     template <typename T>
+    auto allocator<T>::get_page(T* p) -> page* {
+        auto block_begin_ptr = reinterpret_cast<page::block*>(p);
+        for (const auto page : this->page_vec) {
+            const auto pool_block = page->pool_ptr;
+            if (pool_block <= block_begin_ptr && block_begin_ptr <= pool_block + BLOCK_NUM_IN_POOL) {
+                return page;
+            } else {
+                throw std::out_of_range("get page out of range");
+            }
+        }
+        throw std::out_of_range("get page out of range");
+    }
+
+    template <typename T>
     constexpr allocator<T>::allocator() {
-        if (pool == nullptr) {
-            pool = new page;
+        if (page_vec.empty()) {
+            auto pool = new page;
+            page_vec.push_back(pool);
         }
     }
 
@@ -71,6 +94,9 @@ namespace yaa {
          * this pointer will be stored at step_begin_ptr
          */
         page::block* step_begin_ptr = nullptr;
+
+        const auto pool = this->page_vec.front();  // FIXME
+
         auto buffer_to_return = pool->pool_begin_ptr;
         {
             auto iter = buffer_to_return;
@@ -138,11 +164,12 @@ namespace yaa {
 #ifdef DEBUG
         std::cout << "deallocate function in" << std::endl;
 #endif
-        if (!((pool->pool_ptr <= reinterpret_cast<page::block*>(p)) &&
-            (reinterpret_cast<page::block*>(p) < pool->pool_ptr + BLOCK_NUM_IN_POOL))) {
+        if (n * sizeof(T) > ALLOCATE_UPPER_BOUND) {
             ::operator delete(p);
             return;
         }
+
+        auto pool = get_page(p);
 
         /*
          * find the nearest pointer above the block

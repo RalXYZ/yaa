@@ -7,11 +7,16 @@
 #include <chrono>
 #include <concepts>
 
-const int TEST_SIZE = 5'000;
+const int TEST_SIZE = 1000;
 const int PICK_SIZE = 100;
 
-static auto generate_random(int) -> int;
-
+/*
+ * C++20 feature: concept
+ * here declares a concept named "allocator"
+ * firstly, it testes whether the typenames exists in Alloc
+ * secondly, it tries to call the member functions, testing
+ * whether these function exists
+ */
 template<typename Tp, template <typename> typename Alloc>
 concept allocator = requires(Tp value, Alloc<Tp> alloc) {
     typename Alloc<Tp>::value_type;
@@ -21,18 +26,26 @@ concept allocator = requires(Tp value, Alloc<Tp> alloc) {
     alloc.deallocate(&value, static_cast<std::size_t>(0));
 };
 
+/*
+ * the following code are the DECLARATIONS of template functions
+ */
+
+static auto generate_random(int) -> int;
+
 template <typename Tp, template <typename> typename Alloc> requires allocator<Tp, Alloc>
 static auto test_arg(Tp&, Tp&) -> void;
 
 template <template <typename> typename Alloc>
 auto test() -> void;
 
-/***************************************************************************/
+/*
+ * the following code are the DEFINITIONS of template functions
+ */
 
 /*
  * generates a random number by uniform distribution
  */
-auto generate_random(const int max = TEST_SIZE) -> int {
+auto generate_random(const int max = PICK_SIZE) -> int {
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_int_distribution<> dis(1, max);
