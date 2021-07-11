@@ -14,7 +14,7 @@ auto main() -> int {
     test<std::allocator>();
     std::cout << std::endl;
 
-    std::cout << "The following allocation is written by myself." << std::endl;
+    std::cout << "The following allocation procedure is written by myself." << std::endl;
     std::cout << "It might be a little bit slower than the STL implementation," << std::endl;
     std::cout << "but I really tried my best and did all the work on my own," << std::endl;
     std::cout << "and I think it is hard to surpass STL." << std::endl;
@@ -32,7 +32,7 @@ auto main() -> int {
     test<std::allocator>();
     std::cout << std::endl;
 
-    std::cout << "The following allocation is written by myself." << std::endl;
+    std::cout << "The following allocation procedure is written by myself." << std::endl;
     test<yaa::allocator>();
     std::cout << std::endl;
 
