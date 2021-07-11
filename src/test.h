@@ -7,8 +7,8 @@
 #include <chrono>
 #include <concepts>
 
-const int TEST_SIZE = 10000;
-const int PICK_SIZE = 1000;
+extern const int TEST_SIZE;
+extern const int PICK_SIZE ;
 
 /*
  * C++20 feature: concept
@@ -26,9 +26,7 @@ concept allocator = requires(Tp value, Alloc<Tp> alloc) {
     alloc.deallocate(&value, static_cast<std::size_t>(0));
 };
 
-/*
- * the following code are the DECLARATIONS of template functions
- */
+/************************* the following code are the DECLARATIONS of template functions ****************************/
 
 static auto generate_random(int) -> int;
 
@@ -38,9 +36,7 @@ static auto test_arg(Tp&, Tp&) -> void;
 template <template <typename> typename Alloc>
 auto test() -> void;
 
-/*
- * the following code are the DEFINITIONS of template functions
- */
+/************************** the following code are the DEFINITIONS of template functions ***************************/
 
 /*
  * generates a random number by uniform distribution
@@ -49,14 +45,6 @@ auto generate_random(const int max = PICK_SIZE) -> int {
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_int_distribution<> dis(1, max);
-    /*
-    std::poisson_distribution<> dis(2);
-    auto result = dis(gen);
-    if (result == 0) {
-        result = 1;
-    }
-    return result * 4;
-     */
     return dis(gen);
 }
 

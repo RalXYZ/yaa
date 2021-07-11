@@ -28,7 +28,7 @@ namespace yaa {
         using size_type = std::size_t;
         using difference_type = std::ptrdiff_t;
 
-        constexpr allocator();
+        constexpr allocator() = default;
 
         [[nodiscard]]
         constexpr auto allocate(std::size_t) -> T*;
@@ -76,6 +76,7 @@ namespace yaa {
             auto iter = buffer_to_return;
             while (true) {
                 if (buffer_to_return + (block_amount - 1) > page->pool_ptr + BLOCK_NUM_IN_POOL) {
+                    page->is_full = true;
                     throw std::bad_alloc();
                 }
                 bool do_not_need_jump = true;
@@ -128,14 +129,6 @@ namespace yaa {
     }
 
     template <typename T>
-    constexpr allocator<T>::allocator() {
-        if (page_vec.empty()) {
-            auto pool = new page;
-            page_vec.push_back(pool);
-        }
-    }
-
-    template <typename T>
     constexpr auto allocator<T>::allocate(std::size_t n) -> T* {
 #ifdef DEBUG
         std::cout << "allocate function in" << std::endl;
@@ -155,6 +148,9 @@ namespace yaa {
 
         T* return_address = nullptr;
         for (auto page : this->page_vec) {
+            if (page->is_full) {
+                continue;
+            }
             try {
                 return_address = allocate_iter(n, page);
             } catch (std::bad_alloc&) {
@@ -186,30 +182,30 @@ namespace yaa {
             return;
         }
 
-        auto pool = get_page(p);
+        auto page = get_page(p);
 
         /*
          * find the nearest pointer above the block
          * which is to be deallocated
          */
         auto step_start_ptr = block_begin_ptr;
-        for (; step_start_ptr >= pool->pool_ptr; step_start_ptr--) {
-            if (pool->is_ptr[step_start_ptr - pool->pool_ptr]) {
+        for (; step_start_ptr >= page->pool_ptr; step_start_ptr--) {
+            if (page->is_ptr[step_start_ptr - page->pool_ptr]) {
                 break;
             }
         }
 
-        auto step_end_ptr = step_start_ptr < pool->pool_ptr ? pool->pool_begin_ptr : step_start_ptr->next_ptr;
+        auto step_end_ptr = step_start_ptr < page->pool_ptr ? page->pool_begin_ptr : step_start_ptr->next_ptr;
         /*
          * step_start_ptr does not exist, meaning
          * there are adjacent data blocks
          * all the way to the front of the pool_ptr
          */
-        if (step_start_ptr < pool->pool_ptr) {
-            pool->pool_begin_ptr = block_begin_ptr;
+        if (step_start_ptr < page->pool_ptr) {
+            page->pool_begin_ptr = block_begin_ptr;
         } else {
             if (step_start_ptr == block_begin_ptr - 1) {
-                pool->is_ptr[step_start_ptr - pool->pool_ptr] = false;
+                page->is_ptr[step_start_ptr - page->pool_ptr] = false;
             } else {
                 step_start_ptr->next_ptr = block_begin_ptr;
             }
@@ -217,10 +213,10 @@ namespace yaa {
 
         /*
          * update pool_end_ptr if the block
-         * is at the end of the pool
+         * is at the end of the page
          */
-        if (block_end_ptr + 1 == pool->pool_end_ptr) {
-            pool->pool_end_ptr = block_begin_ptr;
+        if (block_end_ptr + 1 == page->pool_end_ptr) {
+            page->pool_end_ptr = block_begin_ptr;
         }
 
         /*
@@ -229,12 +225,15 @@ namespace yaa {
          * and point it to the nearest unallocated block below.
          */
         if (step_end_ptr > block_end_ptr + 1) {
-            pool->is_ptr[block_end_ptr - pool->pool_ptr] = true;
+            page->is_ptr[block_end_ptr - page->pool_ptr] = true;
             block_end_ptr->next_ptr = step_end_ptr;
         }
+
+        page->is_full = false;
+
 #ifdef DEBUG
         std::cout << "block back_ptr at " << block_end_ptr << std::endl;
-        std::cout << "pool_ptr end_ptr at " << pool->pool_end_ptr << std::endl;
+        std::cout << "pool_ptr end_ptr at " << page->pool_end_ptr << std::endl;
         std::cout << "deallocate function out" << std::endl;
 #endif
     }
