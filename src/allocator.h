@@ -20,6 +20,8 @@ namespace yaa {
         static constexpr auto calc_block_amount(std::size_t) noexcept -> std::size_t;
         [[nodiscard]]
         auto get_page(T*) -> page*;
+        [[nodiscard]]
+        constexpr auto allocate_iter(std::size_t, page* page) -> T*;
 
     public:
         using value_type = T;
@@ -52,11 +54,77 @@ namespace yaa {
             const auto pool_block = page->pool_ptr;
             if (pool_block <= block_begin_ptr && block_begin_ptr <= pool_block + BLOCK_NUM_IN_POOL) {
                 return page;
-            } else {
-                throw std::out_of_range("get page out of range");
             }
         }
         throw std::out_of_range("get page out of range");
+    }
+
+    template <typename T>
+    constexpr auto allocator<T>::allocate_iter(std::size_t n, page* page) -> T* {
+        const auto block_amount = calc_block_amount(n);
+
+        /*
+         * we need to step over the data blocks
+         * before the buffer_to_return, there is a pointer,
+         * which points to the first free data_block after the allocated data_block.
+         * this pointer will be stored at step_begin_ptr
+         */
+        page::block* step_begin_ptr = nullptr;
+
+        auto buffer_to_return = page->pool_begin_ptr;
+        {
+            auto iter = buffer_to_return;
+            while (true) {
+                if (buffer_to_return + (block_amount - 1) > page->pool_ptr + BLOCK_NUM_IN_POOL) {
+                    throw std::bad_alloc();
+                }
+                bool do_not_need_jump = true;
+
+                /*
+                 * -1 because we do not care about what is in the last data_block to allocate.
+                 * if the last data_block stores is empty, then nothing will happen.
+                 * if the last data_block stores a pointer, this means the data_block after this data_block stores data,
+                 * this means the newly allocated buffer is adjacent to the next buffer.
+                 */
+                for (int i = 0; i < block_amount - 1; i++, iter++) {
+                    if (page->is_ptr[iter - page->pool_ptr]) {
+                        do_not_need_jump = false;
+                        break;
+                    }
+                }
+                if (do_not_need_jump) {
+                    break;
+                }
+
+                step_begin_ptr = iter;
+                buffer_to_return = iter->next_ptr;
+                iter = buffer_to_return;
+            }
+        }
+
+        /*
+         * calculate end ptr
+         */
+        auto step_end_ptr = buffer_to_return + block_amount;
+        const auto buffer_to_return_end_block = buffer_to_return - page->pool_ptr + (block_amount - 1);
+        /*
+         * if the end of block is a pointer
+         * (which is still an unallocated block)
+         */
+        if (page->is_ptr[buffer_to_return_end_block]) {
+            page->is_ptr[buffer_to_return_end_block] = false;
+            step_end_ptr = page->pool_ptr[buffer_to_return_end_block].next_ptr;
+        }
+
+        // update pool_end_ptr if necessary
+        page->pool_end_ptr = step_end_ptr > page->pool_end_ptr ? step_end_ptr : page->pool_end_ptr;
+
+        if (step_begin_ptr == nullptr) {  // the newly allocated buffer is at the start
+            page->pool_begin_ptr = step_end_ptr;
+        } else {
+            page->pool_ptr[step_begin_ptr - page->pool_ptr].next_ptr = step_end_ptr;
+        }
+        return reinterpret_cast<T*>(buffer_to_return);
     }
 
     template <typename T>
@@ -85,75 +153,24 @@ namespace yaa {
             return reinterpret_cast<T*>(::operator new(n * sizeof(T)));
         }
 
-        const auto block_amount = calc_block_amount(n);
-
-        /*
-         * we need to step over the data blocks
-         * before the buffer_to_return, there is a pointer,
-         * which points to the first free data_block after the allocated data_block.
-         * this pointer will be stored at step_begin_ptr
-         */
-        page::block* step_begin_ptr = nullptr;
-
-        const auto pool = this->page_vec.front();  // FIXME
-
-        auto buffer_to_return = pool->pool_begin_ptr;
-        {
-            auto iter = buffer_to_return;
-            while (true) {
-                if (buffer_to_return + (block_amount - 1) > pool->pool_ptr + BLOCK_NUM_IN_POOL) {
-                    throw std::bad_alloc();
-                }
-                bool do_not_need_jump = true;
-
-                /*
-                 * -1 because we do not care about what is in the last data_block to allocate.
-                 * if the last data_block stores is empty, then nothing will happen.
-                 * if the last data_block stores a pointer, this means the data_block after this data_block stores data,
-                 * this means the newly allocated buffer is adjacent to the next buffer.
-                 */
-                for (int i = 0; i < block_amount - 1; i++, iter++) {
-                    if (pool->is_ptr[iter - pool->pool_ptr]) {
-                        do_not_need_jump = false;
-                        break;
-                    }
-                }
-                if (do_not_need_jump) {
-                    break;
-                }
-
-                step_begin_ptr = iter;
-                buffer_to_return = iter->next_ptr;
-                iter = buffer_to_return;
+        T* return_address = nullptr;
+        for (auto page : this->page_vec) {
+            try {
+                return_address = allocate_iter(n, page);
+            } catch (std::bad_alloc&) {
+                continue;
             }
         }
-
-        /*
-         * calculate end ptr
-         */
-        auto step_end_ptr = buffer_to_return + block_amount;
-        const auto buffer_to_return_end_block = buffer_to_return - pool->pool_ptr + (block_amount - 1);
-        /*
-         * if the end of block is a pointer
-         * (which is still an unallocated block)
-         */
-        if (pool->is_ptr[buffer_to_return_end_block]) {
-            pool->is_ptr[buffer_to_return_end_block] = false;
-            step_end_ptr = pool->pool_ptr[buffer_to_return_end_block].next_ptr;
+        if (return_address == nullptr) {
+            auto pool = new page;
+            page_vec.push_back(pool);
+            return_address = allocate_iter(n, this->page_vec.back());
         }
 
-        // update pool_end_ptr if necessary
-        pool->pool_end_ptr = step_end_ptr > pool->pool_end_ptr ? step_end_ptr : pool->pool_end_ptr;
-
-        if (step_begin_ptr == nullptr) {  // the newly allocated buffer is at the start
-            pool->pool_begin_ptr = step_end_ptr;
-        } else {
-            pool->pool_ptr[step_begin_ptr - pool->pool_ptr].next_ptr = step_end_ptr;
-        }
 #ifdef DEBUG
         std::cout << "allocate function out" << std::endl;
 #endif
-        return reinterpret_cast<T*>(buffer_to_return);
+        return return_address;
     }
 
     template <typename T>

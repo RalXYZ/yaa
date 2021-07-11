@@ -7,8 +7,8 @@
 #include <chrono>
 #include <concepts>
 
-const int TEST_SIZE = 1000;
-const int PICK_SIZE = 100;
+const int TEST_SIZE = 10000;
+const int PICK_SIZE = 1000;
 
 /*
  * C++20 feature: concept
