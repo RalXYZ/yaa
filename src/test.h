@@ -8,7 +8,9 @@
 #include <concepts>
 
 extern const int TEST_SIZE;
-extern const int PICK_SIZE ;
+extern const int PICK_SIZE;
+
+extern bool test_fragment;
 
 /*
  * C++20 feature: concept
@@ -45,7 +47,18 @@ auto generate_random(const int max = PICK_SIZE) -> int {
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_int_distribution<> dis(1, max);
-    return dis(gen);
+    auto result = dis(gen);
+
+    /*
+     * if test_fragment == true, this means we want to take control
+     * of this random function, keeping the random result to a small
+     * value, in order to test the efficiency on small memory allocation
+     */
+    if (test_fragment) {
+        result = 2;
+    }
+
+    return result;
 }
 
 /*
